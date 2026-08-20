@@ -1,0 +1,41 @@
+name: daily-task-issue
+
+# Files an issue on this repo every weekday at 9:00 AM Central Time
+# (14:00 UTC standard / 13:00 UTC daylight — we use 14:00 UTC and
+# accept the one-hour DST drift twice a year). Manual dispatch is
+# available for one-off runs.
+
+on:
+  schedule:
+    - cron: "0 14 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  file-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Pick today's task
+        id: pick
+        run: python scripts/pick_task.py --format issue >> "$GITHUB_OUTPUT"
+
+      - name: File issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: ${{ steps.pick.outputs.title }}
+          BODY: ${{ steps.pick.outputs.body }}
+        run: |
+          if [ -z "$TITLE" ]; then
+            echo "No task for today (weekend or empty rotation); skipping."
+            exit 0
+          fi
+          gh issue create --title "$TITLE" --body "$BODY" --label "daily-task"

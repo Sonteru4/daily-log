@@ -1,0 +1,40 @@
+name: weekly-review
+
+# Sundays at 22:00 UTC (~5-6 PM Central). Regenerates the week's
+# review markdown from public events and commits it if anything
+# changed. Also supports manual dispatch.
+
+on:
+  schedule:
+    - cron: "0 22 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate weekly review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/weekly_review.py --user Sonteru4
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reviews/
+          if git diff --cached --quiet; then
+            echo "No new review content this week; nothing to commit."
+            exit 0
+          fi
+          git commit -m "chore: weekly review $(date -u +%Y-W%V)"
+          git push
